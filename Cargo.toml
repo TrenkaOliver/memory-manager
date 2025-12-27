@@ -1,0 +1,10 @@
+[package]
+name = "memory-manager"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+
+[profile.dev]
+opt-level = 0
+debug = true
