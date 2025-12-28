@@ -6,46 +6,41 @@ use crate::collections::MyVec;
 
 fn main() {
     let mut heap = [0u8; 8192];
+    let ptr = heap.as_ptr();
+
+    let last = unsafe {
+        ptr.add(8192)
+    };
+
+    println!("start: {}", ptr as usize);
+    println!("end: {}", last as usize);
     let mut manager = Manager::new(&mut heap);
 
-    let mut main = MyVec::new(&mut manager);
+    let s = [
+        Foo::new(0, 0),
+        Foo::new(1, 1),
+        Foo::new(2, 2),
+        Foo::new(3, 3),
+        Foo::new(4, 4),
+        Foo::new(5, 5),
+        Foo::new(6, 6),
+        Foo::new(7, 7),
+        Foo::new(8, 8),
+        Foo::new(9, 9),
+    ];
 
-    let mut sub1 = MyVec::new(&mut manager);
-    (0..10).into_iter().for_each(|n| sub1.push(n));
+    let mut v1 = MyVec::from_slice(&s, &mut manager);
 
-    manager.debug_free();
+    v1.push(Foo::new(10, 10));
 
-
-    let mut sub2 = MyVec::new(&mut manager);
-    (10..20).into_iter().for_each(|n| sub2.push(n));
-
-    manager.debug_free();
-
-    println!("ss{}", size_of::<MyVec<'_, i32>>());
-
-    main.push(sub1);
-    main.push(sub2);
-    main.push(MyVec::new(&mut manager));
-
-    (20..30).into_iter().for_each(|n| main[2].push(n));
-
-    manager.debug_free();
-
-
-    for (v_idx, v) in main.iter().enumerate() {
-        println!("{}. subvec:", v_idx);
-        for (e_idx, e) in v.iter().enumerate() {
-            println!("{}. element: {}", e_idx, e);
-        }
-        println!()
+    for (i, f) in v1.into_iter().enumerate() {
+        println!("{}.: {:?}", i, f);
     }
-
-    let a = main.into_iter().next().unwrap();
-    drop(a);
 
     manager.debug_free();
 }
 
+#[repr(align(128))]
 #[derive(Debug)]
 struct Foo {
     a: usize,
@@ -56,12 +51,12 @@ struct Foo {
 #[derive(Debug)]
 struct Deep {
     a: usize,
-    b: i64
+    b: u128
 }
 
 impl Foo {
     fn new(a: usize, b: i64) -> Foo {
-        Foo { a, b, c: Deep { a, b } }
+        Foo { a, b, c: Deep { a, b: b as u128 } }
     }
 }
 

@@ -15,12 +15,18 @@ impl<'a, T> MyVec<'a, T> {
         MyVec { ptr: ptr::null_mut(), len: 0, cap: 0, manager }
     }
     
-    pub fn with_capacity(cap: usize, manager: *mut Manager<'a>) -> MyVec<'a, T> {
+    pub fn with_capacity(capacity: usize, manager: *mut Manager<'a>) -> MyVec<'a, T> {
         let ptr = unsafe {
-            (*manager).alloc(size_of::<T>() * cap) as *mut T
+            (*manager).alloc(size_of::<T>() * capacity, align_of::<T>()) as *mut T
         };
 
-        MyVec { ptr, len: 0, cap, manager }
+        MyVec { ptr, len: 0, cap: capacity, manager }
+    }
+
+    pub fn from_slice(slice: &[T], manager: *mut Manager<'a>) -> MyVec<'a, T> {
+        let mut v = MyVec::with_capacity(slice.len(), manager);
+        v.extend_from_slice(slice);
+        v
     }
 
     pub fn len(&self) -> usize {
@@ -33,6 +39,12 @@ impl<'a, T> MyVec<'a, T> {
 
     pub fn is_empty(&self) -> bool {
         self.len == 0
+    }
+
+    pub fn as_slice(&self) -> &[T] {
+        unsafe {
+            std::slice::from_raw_parts(self.ptr, self.len)
+        }
     }
 
     pub fn iter<'b>(&'b self) -> MyVecIter<'a, 'b, T> {
@@ -82,6 +94,19 @@ impl<'a, T> MyVec<'a, T> {
         
         self.len += other.len;
     }
+
+    pub fn extend_from_slice(&mut self, slice: &[T]) {
+        while self.len + slice.len() >= self.cap{
+            self.reallocate();
+        }
+
+        unsafe {
+            ptr::copy_nonoverlapping(slice.as_ptr(), self.ptr.add(self.len), slice.len());
+        }
+
+        self.len += slice.len();
+    }
+
 
 }
 
@@ -144,7 +169,7 @@ impl<'a, T> MyVec<'a, T> {
         if self.cap == 0 {
             self.cap = 4;
             self.ptr = unsafe {
-                (*self.manager).alloc(4 * size_of::<T>()) as *mut T
+                (*self.manager).alloc(4 * size_of::<T>(), align_of::<T>()) as *mut T
             };
             return;
         }
@@ -158,10 +183,16 @@ impl<'a, T> MyVec<'a, T> {
         };
 
         let new_ptr = unsafe {
-            (*self.manager).alloc(new_cap * size_of::<T>()) as *mut T
+            (*self.manager).alloc(new_cap * size_of::<T>(), align_of::<T>()) as *mut T
         };
 
         unsafe {
+            println!("src: {}", self.ptr as usize);
+            println!("dst: {}", new_ptr as usize);
+            println!("len: {}", self.cap * size_of::<T>());
+
+            println!("dst align: {}", new_ptr as usize % align_of::<T>());
+
             ptr::copy_nonoverlapping(self.ptr, new_ptr, self.cap);
         }
 
@@ -247,7 +278,6 @@ impl<'a, 'b, T> IntoIterator for &'b mut MyVec<'a, T> {
     }
 }
 
-
 //free memory when vec goes out of scope
 impl<'a, T> Drop for MyVec<'a, T> {
     fn drop(&mut self) {
@@ -255,10 +285,8 @@ impl<'a, T> Drop for MyVec<'a, T> {
             for i in 0..self.len {
                 drop(ptr::read(self.ptr.add(i)));
             }
-
-            println!("dropped");
-
             (*self.manager).free(self.ptr);
+            println!("dropped");
         }
     }
 }
@@ -304,6 +332,7 @@ impl<'a, T> Drop for MyVecIntoIter<'a, T> {
             }
             (*self.manager).free(self.ptr);
         }
+        println!("dropped");
     }
 }
 
