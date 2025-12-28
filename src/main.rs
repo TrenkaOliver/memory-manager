@@ -33,8 +33,19 @@ fn main() {
 
     v.append(other);
 
-    for i in 0..v.len() {
-        println!("{}: {:?}", i, v[i]);
+    manager.debug_free();
+
+    for e in &mut v {
+        e.a += 10;
+        e.b += 10;
+    }
+
+    for e in v.drain(3..6) {
+        println!("drained: {:?}", e);
+    }
+
+    for (i, e) in v.iter().enumerate() {
+        println!("{}: {:?}", i, e);
     }
 
     println!("removed: {:?}", removed);

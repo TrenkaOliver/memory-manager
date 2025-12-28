@@ -1,4 +1,4 @@
-use std::{ops::{Index, IndexMut}, ptr};
+use std::{ops::{Index, IndexMut, RangeBounds}, ptr};
 
 use crate::Manager;
 
@@ -7,6 +7,124 @@ pub struct MyVec<'a, T> {
     len: usize,
     cap: usize,
     manager: *mut Manager<'a>,
+}
+
+pub struct MyVecIntoIter<'a, T> {
+    vec: MyVec<'a, T>,
+    index: usize,
+}
+
+impl<'a, T> Iterator for MyVecIntoIter<'a, T> {
+    type Item = T;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.index < self.vec.len {
+            let item = unsafe {
+                let ptr = self.vec.ptr.add(self.index);
+                ptr::read(ptr)
+            };
+            self.index += 1;
+            Some(item)
+        } else {
+            None
+        }
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let remaining = self.vec.len.saturating_sub(self.index);
+        (remaining, Some(remaining))
+    }
+}
+
+pub struct MyVecIter<'a, 'b, T> {
+    vec: &'b MyVec<'a, T>,
+    index: usize,
+}
+
+impl<'a, 'b, T> Iterator for MyVecIter<'a, 'b, T> {
+    type Item = &'b T;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.index < self.vec.len {
+            let out = unsafe {
+                & *self.vec.ptr.add(self.index)
+            };
+            self.index += 1;
+            Some(out)
+        } else {
+            None
+        }
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let remaining = self.vec.len.saturating_sub(self.index);
+        (remaining, Some(remaining))
+    }
+}
+
+pub struct MyVecIterMut<'a, 'b, T> {
+    vec: &'b mut MyVec<'a, T>,
+    index: usize,
+}
+
+impl<'a, 'b, T> Iterator for MyVecIterMut<'a, 'b, T> {
+    type Item = &'b mut T;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.index < self.vec.len {
+            let out = unsafe {
+                &mut *self.vec.ptr.add(self.index)
+            };
+            self.index += 1;
+            Some(out)
+        } else {
+            None
+        }
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let remaining = self.vec.len.saturating_sub(self.index);
+        (remaining, Some(remaining))
+    }
+}
+
+pub struct Drain<'a, 'b, T> {
+    vec: &'b mut MyVec<'a, T>,
+    index: usize,
+    start: usize,
+    end: usize,
+}
+
+impl<'a, 'b, T> Iterator for Drain<'a, 'b, T>  {
+    type Item = T;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.index < self.end {
+            let out = unsafe {
+                ptr::read(self.vec.ptr.add(self.index))
+            };
+            self.index += 1;
+            Some(out)
+        } else {
+            None
+        }
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let remaining = self.end.saturating_sub(self.index);
+        (remaining, Some(remaining))
+    }
+}
+
+impl<'a, 'b, T> Drop for Drain<'a, 'b, T> {
+    fn drop(&mut self) {
+        if self.end != self.vec.len { 
+            unsafe {
+                ptr::copy(self.vec.ptr.add(self.end), self.vec.ptr.add(self.start), self.vec.len - self.end);
+            } 
+        }
+        self.vec.len -= self.end - self.start;
+    }
 }
 
 //constructors, getters
@@ -25,6 +143,22 @@ impl<'a, T> MyVec<'a, T> {
 
     pub fn len(&self) -> usize {
         self.len
+    }
+
+    pub fn capacity(&self) -> usize {
+        self.cap
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len == 0
+    }
+
+    pub fn iter<'b>(&'b self) -> MyVecIter<'a, 'b, T> {
+        MyVecIter { vec: self, index: 0 }
+    }
+
+    pub fn iter_mut<'b>(&'b mut self) -> MyVecIterMut<'a, 'b, T> {
+        MyVecIterMut { vec: self, index: 0 }
     }
 }
 
@@ -71,6 +205,10 @@ impl<'a, T> MyVec<'a, T> {
 
 //removing values
 impl<'a, T> MyVec<'a, T> {
+    pub fn clear(&mut self) {
+        self.len = 0;
+    }
+
     pub fn pop(&mut self) -> Option<T> {
         if self.len == 0 {
             None
@@ -96,6 +234,25 @@ impl<'a, T> MyVec<'a, T> {
         self.len -= 1;
 
         removed
+    }
+
+    pub fn drain<'b, R>(&'b mut self, range: R) -> Drain<'a, 'b, T>
+    where R: RangeBounds<usize> {
+        let len = self.len;
+        let start = match range.start_bound() {
+            std::ops::Bound::Included(&s) => s,
+            std::ops::Bound::Excluded(&s) => s + 1,
+            std::ops::Bound::Unbounded => 0,
+        };
+        let end = match range.end_bound() {
+            std::ops::Bound::Included(&e) => e + 1,
+            std::ops::Bound::Excluded(&e) => e,
+            std::ops::Bound::Unbounded => len,
+        };
+
+        assert!(start <= end && end <= len);
+
+        Drain { vec: self, index: start, start, end }
     }
 }
 
@@ -158,6 +315,47 @@ impl<'a, T> IndexMut<usize> for MyVec<'a, T>  {
         }
     }
 }
+
+//iterator implementations
+impl<'a, T> IntoIterator for MyVec<'a, T> {
+    type Item = T;
+
+    type IntoIter = MyVecIntoIter<'a, T>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        MyVecIntoIter {
+            vec: self,
+            index: 0
+        }
+    }
+}
+
+impl<'a, 'b, T> IntoIterator for &'b MyVec<'a, T> {
+    type Item = &'b T;
+
+    type IntoIter = MyVecIter<'a, 'b, T>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        MyVecIter {
+            vec: self,
+            index: 0
+        }
+    }
+}
+
+impl<'a, 'b, T> IntoIterator for &'b mut MyVec<'a, T> {
+    type Item = &'b mut T;
+
+    type IntoIter = MyVecIterMut<'a, 'b, T>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        MyVecIterMut {
+            vec: self,
+            index: 0
+        }
+    }
+}
+
 
 //free memory when vec goes out of scope
 impl<'a, T> Drop for MyVec<'a, T> {

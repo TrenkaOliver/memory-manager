@@ -44,7 +44,7 @@ impl<'a> Manager<'a> {
                 & *current
             };
             println!("{}. free sequence len = {} bytes", i, len);
-            free_space += len - HEADER_SIZE;
+            free_space += len;
 
             current = unsafe {
                 *current.add(1) as *mut usize
@@ -57,7 +57,6 @@ impl<'a> Manager<'a> {
             }
         }
         println!("free space: {}", free_space);
-        println!("occupied min space = {}", self.bytes.len() - free_space - (i + 1) * HEADER_SIZE);
     }
 
     pub fn alloc(&mut self, size: usize) -> *mut u8 {
