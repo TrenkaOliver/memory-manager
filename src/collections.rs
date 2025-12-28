@@ -60,7 +60,7 @@ impl<'a, T> MyVec<'a, T> {
 impl<'a, T> MyVec<'a, T> {
     pub fn push(&mut self, value: T) {
         if self.len == self.cap {
-            self.reallocate();
+            self.reallocate(None);
         }
         
         unsafe {
@@ -72,7 +72,7 @@ impl<'a, T> MyVec<'a, T> {
 
     pub fn insert(&mut self, value: T, index: usize) {
         if self.len == self.cap {
-            self.reallocate();
+            self.reallocate(None);
         }
 
         unsafe {
@@ -84,8 +84,9 @@ impl<'a, T> MyVec<'a, T> {
     }
 
     pub fn append(&mut self, other: MyVec<'a, T>) {
-        while self.len + other.len >= self.cap {
-            self.reallocate();
+        let sum_len = self.len + other.len;
+        if sum_len >= self.cap {
+            self.reallocate(Some(sum_len));
         }
 
         unsafe {
@@ -96,8 +97,9 @@ impl<'a, T> MyVec<'a, T> {
     }
 
     pub fn extend_from_slice(&mut self, slice: &[T]) {
-        while self.len + slice.len() >= self.cap{
-            self.reallocate();
+        let sum_len = self.len + slice.len();
+        if sum_len >= self.cap {
+            self.reallocate(Some(sum_len));
         }
 
         unsafe {
@@ -165,7 +167,7 @@ impl<'a, T> MyVec<'a, T> {
 
 //local helper functions
 impl<'a, T> MyVec<'a, T> {
-    fn reallocate(&mut self) {
+    fn reallocate(&mut self, to: Option<usize>) {
         if self.cap == 0 {
             self.cap = 4;
             self.ptr = unsafe {
@@ -174,13 +176,17 @@ impl<'a, T> MyVec<'a, T> {
             return;
         }
 
-        let new_cap = {
+        let mut new_cap = {
             if self.cap <= 16 {
                 self.cap * 2
             } else {
                 self.cap + self.cap / 2
             }
         };
+
+        if let Some(c) = to && c > new_cap {
+            new_cap = c;
+        }
 
         let new_ptr = unsafe {
             (*self.manager).alloc(new_cap * size_of::<T>(), align_of::<T>()) as *mut T
