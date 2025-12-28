@@ -10,6 +10,7 @@ pub struct Manager<'a> {
 //n := size_of::<usize>()
 //free block: n bytes: size(usize), n bytes:ptr to next free block(*mut usize), the rest isn't used
 //allocated block: n bytes: size(usize) n bytes: placeholder, ...used bytes..., max n bytes padding if necesarry
+//first 2n bytes is the HEADER
 //size includes the whole block not just the used/rest bytes
 //the last free block's ptr to the next free block (which doesn't exists) as a usize is equal to the bytes array's len marking it as the last free block
 //ptrs returned by the alloc fn will point to the first user used byte not the first in the header (size's first byte)
