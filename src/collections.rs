@@ -9,124 +9,6 @@ pub struct MyVec<'a, T> {
     manager: *mut Manager<'a>,
 }
 
-pub struct MyVecIntoIter<'a, T> {
-    vec: MyVec<'a, T>,
-    index: usize,
-}
-
-impl<'a, T> Iterator for MyVecIntoIter<'a, T> {
-    type Item = T;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.index < self.vec.len {
-            let item = unsafe {
-                let ptr = self.vec.ptr.add(self.index);
-                ptr::read(ptr)
-            };
-            self.index += 1;
-            Some(item)
-        } else {
-            None
-        }
-    }
-
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        let remaining = self.vec.len.saturating_sub(self.index);
-        (remaining, Some(remaining))
-    }
-}
-
-pub struct MyVecIter<'a, 'b, T> {
-    vec: &'b MyVec<'a, T>,
-    index: usize,
-}
-
-impl<'a, 'b, T> Iterator for MyVecIter<'a, 'b, T> {
-    type Item = &'b T;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.index < self.vec.len {
-            let out = unsafe {
-                & *self.vec.ptr.add(self.index)
-            };
-            self.index += 1;
-            Some(out)
-        } else {
-            None
-        }
-    }
-
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        let remaining = self.vec.len.saturating_sub(self.index);
-        (remaining, Some(remaining))
-    }
-}
-
-pub struct MyVecIterMut<'a, 'b, T> {
-    vec: &'b mut MyVec<'a, T>,
-    index: usize,
-}
-
-impl<'a, 'b, T> Iterator for MyVecIterMut<'a, 'b, T> {
-    type Item = &'b mut T;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.index < self.vec.len {
-            let out = unsafe {
-                &mut *self.vec.ptr.add(self.index)
-            };
-            self.index += 1;
-            Some(out)
-        } else {
-            None
-        }
-    }
-
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        let remaining = self.vec.len.saturating_sub(self.index);
-        (remaining, Some(remaining))
-    }
-}
-
-pub struct Drain<'a, 'b, T> {
-    vec: &'b mut MyVec<'a, T>,
-    index: usize,
-    start: usize,
-    end: usize,
-}
-
-impl<'a, 'b, T> Iterator for Drain<'a, 'b, T>  {
-    type Item = T;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.index < self.end {
-            let out = unsafe {
-                ptr::read(self.vec.ptr.add(self.index))
-            };
-            self.index += 1;
-            Some(out)
-        } else {
-            None
-        }
-    }
-
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        let remaining = self.end.saturating_sub(self.index);
-        (remaining, Some(remaining))
-    }
-}
-
-impl<'a, 'b, T> Drop for Drain<'a, 'b, T> {
-    fn drop(&mut self) {
-        if self.end != self.vec.len { 
-            unsafe {
-                ptr::copy(self.vec.ptr.add(self.end), self.vec.ptr.add(self.start), self.vec.len - self.end);
-            } 
-        }
-        self.vec.len -= self.end - self.start;
-    }
-}
-
 //constructors, getters
 impl<'a, T> MyVec<'a, T> {
     pub fn new(manager: *mut Manager<'a>) -> MyVec<'a, T> {
@@ -170,7 +52,7 @@ impl<'a, T> MyVec<'a, T> {
         }
         
         unsafe {
-            *self.ptr.add(self.len) = value
+            ptr::write(self.ptr.add(self.len), value);
         }
 
         self.len += 1;
@@ -183,7 +65,7 @@ impl<'a, T> MyVec<'a, T> {
 
         unsafe {
             ptr::copy(self.ptr.add(index), self.ptr.add(index + 1), self.len - index);
-            *self.ptr.add(index) = value;
+            ptr::write(self.ptr.add(index), value);
         }
 
         self.len += 1;
@@ -323,9 +205,18 @@ impl<'a, T> IntoIterator for MyVec<'a, T> {
     type IntoIter = MyVecIntoIter<'a, T>;
 
     fn into_iter(self) -> Self::IntoIter {
+        let ptr = self.ptr;
+        let index = 0;
+        let len = self.len;
+        let manager = self.manager;
+
+        std::mem::forget(self);
+
         MyVecIntoIter {
-            vec: self,
-            index: 0
+            ptr,
+            index,
+            len,
+            manager
         }
     }
 }
@@ -361,7 +252,148 @@ impl<'a, 'b, T> IntoIterator for &'b mut MyVec<'a, T> {
 impl<'a, T> Drop for MyVec<'a, T> {
     fn drop(&mut self) {
         unsafe {
+            for i in 0..self.len {
+                drop(ptr::read(self.ptr.add(i)));
+            }
+
+            println!("dropped");
+
             (*self.manager).free(self.ptr);
         }
+    }
+}
+
+
+
+
+//ITERATORS
+pub struct MyVecIntoIter<'a, T> {
+    ptr: *mut T,
+    index: usize,
+    len: usize,
+    manager: *mut Manager<'a>,
+}
+
+impl<'a, T> Iterator for MyVecIntoIter<'a, T> {
+    type Item = T;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.index < self.len {
+            let item = unsafe {
+                let ptr = self.ptr.add(self.index);
+                ptr::read(ptr)
+            };
+            self.index += 1;
+            Some(item)
+        } else {
+            None
+        }
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let remaining = self.len.saturating_sub(self.index);
+        (remaining, Some(remaining))
+    }
+}
+
+impl<'a, T> Drop for MyVecIntoIter<'a, T> {
+    fn drop(&mut self) {
+        unsafe {
+            for i in self.index..self.len {
+                ptr::drop_in_place(self.ptr.add(i));
+            }
+            (*self.manager).free(self.ptr);
+        }
+    }
+}
+
+pub struct MyVecIter<'a, 'b, T> {
+    vec: &'b MyVec<'a, T>,
+    index: usize,
+}
+
+impl<'a, 'b, T> Iterator for MyVecIter<'a, 'b, T> {
+    type Item = &'b T;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.index < self.vec.len {
+            let out = unsafe {
+                & *self.vec.ptr.add(self.index)
+            };
+            self.index += 1;
+            Some(out)
+        } else {
+            None
+        }
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let remaining = self.vec.len.saturating_sub(self.index);
+        (remaining, Some(remaining))
+    }
+}
+
+pub struct MyVecIterMut<'a, 'b, T> {
+    vec: &'b mut MyVec<'a, T>,
+    index: usize,
+}
+
+impl<'a, 'b, T> Iterator for MyVecIterMut<'a, 'b, T> {
+    type Item = &'b mut T;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.index < self.vec.len {
+            let out = unsafe {
+                &mut *self.vec.ptr.add(self.index)
+            };
+            self.index += 1;
+            Some(out)
+        } else {
+            None
+        }
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let remaining = self.vec.len.saturating_sub(self.index);
+        (remaining, Some(remaining))
+    }
+}
+
+pub struct Drain<'a, 'b, T> {
+    vec: &'b mut MyVec<'a, T>,
+    index: usize,
+    start: usize,
+    end: usize,
+}
+
+impl<'a, 'b, T> Iterator for Drain<'a, 'b, T>  {
+    type Item = T;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.index < self.end {
+            let out = unsafe {
+                ptr::read(self.vec.ptr.add(self.index))
+            };
+            self.index += 1;
+            Some(out)
+        } else {
+            None
+        }
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let remaining = self.end.saturating_sub(self.index);
+        (remaining, Some(remaining))
+    }
+}
+
+impl<'a, 'b, T> Drop for Drain<'a, 'b, T> {
+    fn drop(&mut self) {
+        if self.end != self.vec.len { 
+            unsafe {
+                ptr::copy(self.vec.ptr.add(self.end), self.vec.ptr.add(self.start), self.vec.len - self.end);
+            } 
+        }
+        self.vec.len -= self.end - self.start;
     }
 }

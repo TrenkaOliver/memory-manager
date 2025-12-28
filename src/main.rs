@@ -8,48 +8,40 @@ fn main() {
     let mut heap = [0u8; 8192];
     let mut manager = Manager::new(&mut heap);
 
-    let mut v = MyVec::new(&mut manager);
+    let mut main = MyVec::new(&mut manager);
 
-    v.push(Foo::new(0, 0));
-    v.push(Foo::new(1, 1));
-    v.push(Foo::new(2, 2));
-    v.push(Foo::new(3, 3));
-    v.push(Foo::new(4, 4));
-
-    let mut other = MyVec::new(&mut manager);
-
-    other.push(Foo::new(1, 123));
-    other.push(Foo::new(123, 2));
-    other.push(Foo::new(3, 123));
-    other.insert(Foo::new(0, 0), 2);
-    other.push(Foo::new(123, 4));
-    other.push(Foo::new(5, 123));
-
-    let removed = v.remove(2);
-    let a = &mut v[2];
-    a.c.a = 123141451;
-    let popped = v.pop();
-
-
-    v.append(other);
+    let mut sub1 = MyVec::new(&mut manager);
+    (0..10).into_iter().for_each(|n| sub1.push(n));
 
     manager.debug_free();
 
-    for e in &mut v {
-        e.a += 10;
-        e.b += 10;
+
+    let mut sub2 = MyVec::new(&mut manager);
+    (10..20).into_iter().for_each(|n| sub2.push(n));
+
+    manager.debug_free();
+
+    println!("ss{}", size_of::<MyVec<'_, i32>>());
+
+    main.push(sub1);
+    main.push(sub2);
+    main.push(MyVec::new(&mut manager));
+
+    (20..30).into_iter().for_each(|n| main[2].push(n));
+
+    manager.debug_free();
+
+
+    for (v_idx, v) in main.iter().enumerate() {
+        println!("{}. subvec:", v_idx);
+        for (e_idx, e) in v.iter().enumerate() {
+            println!("{}. element: {}", e_idx, e);
+        }
+        println!()
     }
 
-    for e in v.drain(3..6) {
-        println!("drained: {:?}", e);
-    }
-
-    for (i, e) in v.iter().enumerate() {
-        println!("{}: {:?}", i, e);
-    }
-
-    println!("removed: {:?}", removed);
-    println!("popped: {:?}", popped);
+    let a = main.into_iter().next().unwrap();
+    drop(a);
 
     manager.debug_free();
 }
