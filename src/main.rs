@@ -1,14 +1,9 @@
 mod manager;
-use manager ::Manager;
-
 mod collections;
 use crate::collections::MyVec;
 
-static mut HEAP: [u8; 8192] = [0; 8192];
 
 fn main() {
-
-    let mut manager = Manager::new( &raw mut HEAP);
 
     let s = [
         Foo::new(0, 0),
@@ -23,13 +18,19 @@ fn main() {
         Foo::new(9, 9),
     ];
 
-    let v1 = MyVec::from_slice(&s, &mut manager);
+    let v1 = MyVec::from_slice(&s);
 
-    for (i, f) in v1.into_iter().enumerate() {
+    for (i, f) in v1.iter().enumerate() {
         println!("{}.: {:?}", i, f);
     }
 
-    let v2 = MyVec::from_slice(&s, &mut manager);
+    let mut v2 = MyVec::from_slice(&s);
+    for e in v2.drain(..) {
+        println!("drained: {:?}", {e});
+    }
+
+    v2.iter().for_each(|e| println!("remaining: {:?}", e));
+
 
 }
 

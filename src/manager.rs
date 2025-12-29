@@ -1,6 +1,38 @@
 const HEADER_SIZE: usize = size_of::<usize>() * 2;
+const LEN: usize = 8192;
 
-pub struct Manager {
+static mut HEAP: [u8; LEN] = {
+    let mut bytes = [0u8; LEN];
+
+    let size_bytes = LEN.to_ne_bytes();
+    let max_bytes = usize::MAX.to_ne_bytes();
+
+    let mut i = 0;
+    while i < size_of::<usize>() {
+        bytes[i] = size_bytes[i];
+        bytes[i + size_of::<usize>()] = max_bytes[i];
+        i+= 1;
+    }
+
+    bytes
+};
+
+static mut MANAGER: Manager = Manager::new();
+
+pub unsafe fn my_alloc(size: usize, alignment: usize) -> *mut u8 {
+    unsafe {
+        // MANAGER.alloc(size, alignment)
+        (* &raw mut MANAGER).alloc(size, alignment)
+    }
+}
+
+pub unsafe fn my_free<T>(ptr: *mut T) {
+    unsafe {
+        (* &raw mut MANAGER).free(ptr);
+    }
+}
+
+struct Manager {
     first_free: *mut usize,
 }
 
@@ -14,28 +46,18 @@ pub struct Manager {
 //the last free block's ptr to the next free block (which doesn't exists) as a usize is equal to the bytes array's len marking it as the last free block
 //ptrs returned by the alloc fn will point to the first user used byte not the first in the header (size's first byte)
 impl Manager {
-    pub fn new(bytes: *mut [u8]) -> Manager {
+    const fn new() -> Manager {
         //creating manager for smaller array than HEADER_SIZE wouldn't make sense
-        assert!(bytes.len() > HEADER_SIZE);
-        
-        unsafe {
-            //sets the size of the first (currently only) free block to the len of the array
-            *(bytes as *mut usize) = bytes.len();
-
-            //as mentioned above, the ptr of the last free block as a usize is equal to the len of the byte array's len
-            *(bytes as *mut usize).add(1) = usize::MAX;
-        }
+        assert!(LEN > HEADER_SIZE);
 
         //create a ptr to the first free block to know where to start searching for allocation
-        let first_free = bytes as *mut usize;
-
-        println!("starts at: {:?}", first_free as usize);
+        let first_free = &raw mut HEAP as *mut usize;
 
         Manager { first_free }
     }
 
     //fn to debug free space, used for testing
-    pub fn debug_free(&self) {
+    fn debug_free(&self) {
         println!("\ndebugging free sequences");
         println!("HEADER_SIZE = {}", HEADER_SIZE);
         let mut free_space = 0;
@@ -61,7 +83,7 @@ impl Manager {
         println!("free space: {}", free_space);
     }
 
-    pub fn alloc(&mut self, size: usize, alignment: usize) -> *mut u8 {
+    unsafe fn alloc(&mut self, size: usize, alignment: usize) -> *mut u8 {
         //current_free is &mut to the pointer which points to the size (which is the first 4 bytes) of the currently inspected free block
         let mut current_free = &mut self.first_free;
 
@@ -166,7 +188,7 @@ impl Manager {
         }
     }
 
-    pub fn free<T>(&mut self, src: *mut T) {
+    fn free<T>(&mut self, src: *mut T) {
         //sets the new free block's next free_block idx to the current first_free block's idx
         let ptr = src as *mut usize;
 

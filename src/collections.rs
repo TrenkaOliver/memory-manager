@@ -1,30 +1,29 @@
 use std::{ops::{Index, IndexMut, RangeBounds}, ptr};
 
-use crate::Manager;
+use crate::manager::{my_alloc, my_free};
 
 pub struct MyVec<T> {
     ptr: *mut T,
     len: usize,
     cap: usize,
-    manager: *mut Manager,
 }
 
 //constructors, getters
 impl<T> MyVec<T> {
-    pub fn new(manager: *mut Manager) -> MyVec<T> {
-        MyVec { ptr: ptr::null_mut(), len: 0, cap: 0, manager }
+    pub fn new() -> MyVec<T> {
+        MyVec { ptr: ptr::null_mut(), len: 0, cap: 0 }
     }
     
-    pub fn with_capacity(capacity: usize, manager: *mut Manager) -> MyVec<T> {
+    pub fn with_capacity(capacity: usize) -> MyVec<T> {
         let ptr = unsafe {
-            (*manager).alloc(size_of::<T>() * capacity, align_of::<T>()) as *mut T
+            my_alloc(size_of::<T>() * capacity, align_of::<T>()) as *mut T
         };
 
-        MyVec { ptr, len: 0, cap: capacity, manager }
+        MyVec { ptr, len: 0, cap: capacity }
     }
 
-    pub fn from_slice(slice: &[T], manager: *mut Manager) -> MyVec<T> {
-        let mut v = MyVec::with_capacity(slice.len(), manager);
+    pub fn from_slice(slice: &[T]) -> MyVec<T> {
+        let mut v = MyVec::with_capacity(slice.len());
         v.extend_from_slice(slice);
         v
     }
@@ -172,7 +171,7 @@ impl<T> MyVec<T> {
         if self.cap == 0 {
             self.cap = 4;
             self.ptr = unsafe {
-                (*self.manager).alloc(4 * size_of::<T>(), align_of::<T>()) as *mut T
+                my_alloc(4 * size_of::<T>(), align_of::<T>()) as *mut T
             };
             return;
         }
@@ -190,7 +189,7 @@ impl<T> MyVec<T> {
         }
 
         let new_ptr = unsafe {
-            (*self.manager).alloc(new_cap * size_of::<T>(), align_of::<T>()) as *mut T
+            my_alloc(new_cap * size_of::<T>(), align_of::<T>()) as *mut T
         };
 
         unsafe {
@@ -204,7 +203,7 @@ impl<T> MyVec<T> {
         }
 
         unsafe {
-            (*self.manager).free(self.ptr);
+            my_free(self.ptr);
         }
 
         self.ptr = new_ptr;
@@ -246,7 +245,6 @@ impl<T> IntoIterator for MyVec<T> {
         let ptr = self.ptr;
         let index = 0;
         let len = self.len;
-        let manager = self.manager;
 
         std::mem::forget(self);
 
@@ -254,7 +252,6 @@ impl<T> IntoIterator for MyVec<T> {
             ptr,
             index,
             len,
-            manager
         }
     }
 }
@@ -292,7 +289,7 @@ impl<T> Drop for MyVec<T> {
             for i in 0..self.len {
                 drop(ptr::read(self.ptr.add(i)));
             }
-            (*self.manager).free(self.ptr);
+            my_free(self.ptr);
             println!("dropped");
         }
     }
@@ -303,7 +300,6 @@ pub struct MyVecIntoIter<T> {
     ptr: *mut T,
     index: usize,
     len: usize,
-    manager: *mut Manager,
 }
 
 impl<T> Iterator for MyVecIntoIter<T> {
@@ -334,7 +330,7 @@ impl<T> Drop for MyVecIntoIter<T> {
             for i in self.index..self.len {
                 ptr::drop_in_place(self.ptr.add(i));
             }
-            (*self.manager).free(self.ptr);
+            my_free(self.ptr);
         }
         println!("dropped");
     }
