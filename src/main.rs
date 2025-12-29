@@ -4,17 +4,11 @@ use manager ::Manager;
 mod collections;
 use crate::collections::MyVec;
 
+static mut HEAP: [u8; 8192] = [0; 8192];
+
 fn main() {
-    let mut heap = [0u8; 8192];
-    let ptr = heap.as_ptr();
 
-    let last = unsafe {
-        ptr.add(8192)
-    };
-
-    println!("start: {}", ptr as usize);
-    println!("end: {}", last as usize);
-    let mut manager = Manager::new(&mut heap);
+    let mut manager = Manager::new( &raw mut HEAP);
 
     let s = [
         Foo::new(0, 0),
@@ -29,18 +23,17 @@ fn main() {
         Foo::new(9, 9),
     ];
 
-    let mut v1 = MyVec::from_slice(&s, &mut manager);
-
-    v1.push(Foo::new(10, 10));
+    let v1 = MyVec::from_slice(&s, &mut manager);
 
     for (i, f) in v1.into_iter().enumerate() {
         println!("{}.: {:?}", i, f);
     }
 
-    manager.debug_free();
+    let v2 = MyVec::from_slice(&s, &mut manager);
+
 }
 
-#[repr(align(128))]
+
 #[derive(Debug)]
 struct Foo {
     a: usize,

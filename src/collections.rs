@@ -2,20 +2,20 @@ use std::{ops::{Index, IndexMut, RangeBounds}, ptr};
 
 use crate::Manager;
 
-pub struct MyVec<'a, T> {
+pub struct MyVec<T> {
     ptr: *mut T,
     len: usize,
     cap: usize,
-    manager: *mut Manager<'a>,
+    manager: *mut Manager,
 }
 
 //constructors, getters
-impl<'a, T> MyVec<'a, T> {
-    pub fn new(manager: *mut Manager<'a>) -> MyVec<'a, T> {
+impl<T> MyVec<T> {
+    pub fn new(manager: *mut Manager) -> MyVec<T> {
         MyVec { ptr: ptr::null_mut(), len: 0, cap: 0, manager }
     }
     
-    pub fn with_capacity(capacity: usize, manager: *mut Manager<'a>) -> MyVec<'a, T> {
+    pub fn with_capacity(capacity: usize, manager: *mut Manager) -> MyVec<T> {
         let ptr = unsafe {
             (*manager).alloc(size_of::<T>() * capacity, align_of::<T>()) as *mut T
         };
@@ -23,7 +23,7 @@ impl<'a, T> MyVec<'a, T> {
         MyVec { ptr, len: 0, cap: capacity, manager }
     }
 
-    pub fn from_slice(slice: &[T], manager: *mut Manager<'a>) -> MyVec<'a, T> {
+    pub fn from_slice(slice: &[T], manager: *mut Manager) -> MyVec<T> {
         let mut v = MyVec::with_capacity(slice.len(), manager);
         v.extend_from_slice(slice);
         v
@@ -47,17 +47,17 @@ impl<'a, T> MyVec<'a, T> {
         }
     }
 
-    pub fn iter<'b>(&'b self) -> MyVecIter<'a, 'b, T> {
+    pub fn iter<'a>(&'a self) -> MyVecIter<'a, T> {
         MyVecIter { vec: self, index: 0 }
     }
 
-    pub fn iter_mut<'b>(&'b mut self) -> MyVecIterMut<'a, 'b, T> {
+    pub fn iter_mut<'a>(&'a mut self) -> MyVecIterMut<'a, T> {
         MyVecIterMut { vec: self, index: 0 }
     }
 }
 
 //adding values
-impl<'a, T> MyVec<'a, T> {
+impl<T> MyVec<T> {
     pub fn push(&mut self, value: T) {
         if self.len == self.cap {
             self.reallocate(None);
@@ -83,9 +83,9 @@ impl<'a, T> MyVec<'a, T> {
         self.len += 1;
     }
 
-    pub fn append(&mut self, other: MyVec<'a, T>) {
+    pub fn append(&mut self, other: MyVec<T>) {
         let sum_len = self.len + other.len;
-        if sum_len >= self.cap {
+        if sum_len > self.cap {
             self.reallocate(Some(sum_len));
         }
 
@@ -98,7 +98,8 @@ impl<'a, T> MyVec<'a, T> {
 
     pub fn extend_from_slice(&mut self, slice: &[T]) {
         let sum_len = self.len + slice.len();
-        if sum_len >= self.cap {
+        if sum_len > self.cap {
+            println!("aofhawifhjawifj");
             self.reallocate(Some(sum_len));
         }
 
@@ -113,7 +114,7 @@ impl<'a, T> MyVec<'a, T> {
 }
 
 //removing values
-impl<'a, T> MyVec<'a, T> {
+impl<T> MyVec<T> {
     pub fn clear(&mut self) {
         self.len = 0;
     }
@@ -145,7 +146,7 @@ impl<'a, T> MyVec<'a, T> {
         removed
     }
 
-    pub fn drain<'b, R>(&'b mut self, range: R) -> Drain<'a, 'b, T>
+    pub fn drain<'a, R>(&'a mut self, range: R) -> Drain<'a, T>
     where R: RangeBounds<usize> {
         let len = self.len;
         let start = match range.start_bound() {
@@ -166,7 +167,7 @@ impl<'a, T> MyVec<'a, T> {
 }
 
 //local helper functions
-impl<'a, T> MyVec<'a, T> {
+impl<T> MyVec<T> {
     fn reallocate(&mut self, to: Option<usize>) {
         if self.cap == 0 {
             self.cap = 4;
@@ -212,7 +213,7 @@ impl<'a, T> MyVec<'a, T> {
 }
 
 //access
-impl<'a, T> Index<usize> for MyVec<'a, T>  {
+impl<T> Index<usize> for MyVec<T>  {
     type Output = T;
 
     fn index(&self, index: usize) -> &Self::Output {
@@ -225,7 +226,7 @@ impl<'a, T> Index<usize> for MyVec<'a, T>  {
 }
 
 //mutable access
-impl<'a, T> IndexMut<usize> for MyVec<'a, T>  {
+impl<T> IndexMut<usize> for MyVec<T>  {
     fn index_mut(&mut self, index: usize) -> &mut Self::Output {
         assert!(index < self.len);
 
@@ -236,10 +237,10 @@ impl<'a, T> IndexMut<usize> for MyVec<'a, T>  {
 }
 
 //iterator implementations
-impl<'a, T> IntoIterator for MyVec<'a, T> {
+impl<T> IntoIterator for MyVec<T> {
     type Item = T;
 
-    type IntoIter = MyVecIntoIter<'a, T>;
+    type IntoIter = MyVecIntoIter<T>;
 
     fn into_iter(self) -> Self::IntoIter {
         let ptr = self.ptr;
@@ -258,10 +259,10 @@ impl<'a, T> IntoIterator for MyVec<'a, T> {
     }
 }
 
-impl<'a, 'b, T> IntoIterator for &'b MyVec<'a, T> {
-    type Item = &'b T;
+impl<'a, T> IntoIterator for &'a MyVec<T> {
+    type Item = &'a T;
 
-    type IntoIter = MyVecIter<'a, 'b, T>;
+    type IntoIter = MyVecIter<'a, T>;
 
     fn into_iter(self) -> Self::IntoIter {
         MyVecIter {
@@ -271,10 +272,10 @@ impl<'a, 'b, T> IntoIterator for &'b MyVec<'a, T> {
     }
 }
 
-impl<'a, 'b, T> IntoIterator for &'b mut MyVec<'a, T> {
-    type Item = &'b mut T;
+impl<'a, T> IntoIterator for &'a mut MyVec<T> {
+    type Item = &'a mut T;
 
-    type IntoIter = MyVecIterMut<'a, 'b, T>;
+    type IntoIter = MyVecIterMut<'a, T>;
 
     fn into_iter(self) -> Self::IntoIter {
         MyVecIterMut {
@@ -285,7 +286,7 @@ impl<'a, 'b, T> IntoIterator for &'b mut MyVec<'a, T> {
 }
 
 //free memory when vec goes out of scope
-impl<'a, T> Drop for MyVec<'a, T> {
+impl<T> Drop for MyVec<T> {
     fn drop(&mut self) {
         unsafe {
             for i in 0..self.len {
@@ -297,18 +298,15 @@ impl<'a, T> Drop for MyVec<'a, T> {
     }
 }
 
-
-
-
 //ITERATORS
-pub struct MyVecIntoIter<'a, T> {
+pub struct MyVecIntoIter<T> {
     ptr: *mut T,
     index: usize,
     len: usize,
-    manager: *mut Manager<'a>,
+    manager: *mut Manager,
 }
 
-impl<'a, T> Iterator for MyVecIntoIter<'a, T> {
+impl<T> Iterator for MyVecIntoIter<T> {
     type Item = T;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -330,7 +328,7 @@ impl<'a, T> Iterator for MyVecIntoIter<'a, T> {
     }
 }
 
-impl<'a, T> Drop for MyVecIntoIter<'a, T> {
+impl<T> Drop for MyVecIntoIter<T> {
     fn drop(&mut self) {
         unsafe {
             for i in self.index..self.len {
@@ -342,13 +340,13 @@ impl<'a, T> Drop for MyVecIntoIter<'a, T> {
     }
 }
 
-pub struct MyVecIter<'a, 'b, T> {
-    vec: &'b MyVec<'a, T>,
+pub struct MyVecIter<'a, T> {
+    vec: &'a MyVec<T>,
     index: usize,
 }
 
-impl<'a, 'b, T> Iterator for MyVecIter<'a, 'b, T> {
-    type Item = &'b T;
+impl<'a, T> Iterator for MyVecIter<'a, T> {
+    type Item = &'a T;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.index < self.vec.len {
@@ -368,13 +366,13 @@ impl<'a, 'b, T> Iterator for MyVecIter<'a, 'b, T> {
     }
 }
 
-pub struct MyVecIterMut<'a, 'b, T> {
-    vec: &'b mut MyVec<'a, T>,
+pub struct MyVecIterMut<'a, T> {
+    vec: &'a mut MyVec<T>,
     index: usize,
 }
 
-impl<'a, 'b, T> Iterator for MyVecIterMut<'a, 'b, T> {
-    type Item = &'b mut T;
+impl<'a, T> Iterator for MyVecIterMut<'a, T> {
+    type Item = &'a mut T;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.index < self.vec.len {
@@ -394,14 +392,14 @@ impl<'a, 'b, T> Iterator for MyVecIterMut<'a, 'b, T> {
     }
 }
 
-pub struct Drain<'a, 'b, T> {
-    vec: &'b mut MyVec<'a, T>,
+pub struct Drain<'a, T> {
+    vec: &'a mut MyVec<T>,
     index: usize,
     start: usize,
     end: usize,
 }
 
-impl<'a, 'b, T> Iterator for Drain<'a, 'b, T>  {
+impl<'a, T> Iterator for Drain<'a, T>  {
     type Item = T;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -422,7 +420,7 @@ impl<'a, 'b, T> Iterator for Drain<'a, 'b, T>  {
     }
 }
 
-impl<'a, 'b, T> Drop for Drain<'a, 'b, T> {
+impl<'a, T> Drop for Drain<'a, T> {
     fn drop(&mut self) {
         if self.end != self.vec.len { 
             unsafe {

@@ -1,7 +1,6 @@
 const HEADER_SIZE: usize = size_of::<usize>() * 2;
 
-pub struct Manager<'a> {
-    bytes: &'a mut [u8],
+pub struct Manager {
     first_free: *mut usize,
 }
 
@@ -14,25 +13,25 @@ pub struct Manager<'a> {
 //size includes the whole block not just the used/rest bytes
 //the last free block's ptr to the next free block (which doesn't exists) as a usize is equal to the bytes array's len marking it as the last free block
 //ptrs returned by the alloc fn will point to the first user used byte not the first in the header (size's first byte)
-impl<'a> Manager<'a> {
-    pub fn new(bytes: &'a mut [u8]) -> Manager<'a> {
+impl Manager {
+    pub fn new(bytes: *mut [u8]) -> Manager {
         //creating manager for smaller array than HEADER_SIZE wouldn't make sense
         assert!(bytes.len() > HEADER_SIZE);
-
+        
         unsafe {
             //sets the size of the first (currently only) free block to the len of the array
-            *(bytes.as_ptr() as *mut usize) = bytes.len();
+            *(bytes as *mut usize) = bytes.len();
 
             //as mentioned above, the ptr of the last free block as a usize is equal to the len of the byte array's len
-            *(bytes.as_ptr() as *mut usize).add(1) = usize::MAX;
+            *(bytes as *mut usize).add(1) = usize::MAX;
         }
 
         //create a ptr to the first free block to know where to start searching for allocation
-        let first_free = bytes.as_ptr() as *mut usize;
+        let first_free = bytes as *mut usize;
 
         println!("starts at: {:?}", first_free as usize);
 
-        Manager { bytes, first_free }
+        Manager { first_free }
     }
 
     //fn to debug free space, used for testing
@@ -67,32 +66,17 @@ impl<'a> Manager<'a> {
         let mut current_free = &mut self.first_free;
 
         let alignment = alignment.max(8);
-        //size requirement for allocation
-        // println!("size: {}", size);
-        // println!("header_size: {}", HEADER_SIZE);
-        // println!("remainder: {}", size % 8);
-        // println!("complition: {}", 8 - (size % 8));
-        // let new_size = size + HEADER_SIZE + (8 - (size % 8));
-        // println!("new_size: {}", new_size);
-
-        println!("size: {}", size);
-        println!("alignment: {}", alignment);
 
         let mut end_pad = size_of::<usize>() - size % size_of::<usize>();
         if end_pad == size_of::<usize>() {
             end_pad = 0;
         }
 
-        println!("end_pad: {}", end_pad);
-
         loop {
             //copy the pointee of current_size, so I don't need to dereference it later on each time I need the value
             let current_size = unsafe {
                 **current_free
             };
-
-            println!("current_free: {}", *current_free as usize);
-            println!("current_size: {}", current_size);
 
             let mut front_pad = unsafe {
                 alignment - (current_free.add(2) as usize % alignment)
@@ -102,11 +86,7 @@ impl<'a> Manager<'a> {
                 front_pad = 0;
             }
 
-            println!("front_pad: {}", front_pad);
-
             let new_size = front_pad + HEADER_SIZE + size + end_pad;
-
-            println!("new_size: {}", new_size);
 
             //if it's (data + header size) is larger, than check the next free block
             if new_size > current_size {
@@ -122,7 +102,7 @@ impl<'a> Manager<'a> {
             //if the differrence between the current size and the new size is not greater than the header
             //than also append those extra bytes to the end of the new allocated block
             //bc it couldn't be used as a new free block, where later on new data could be allocated
-            else if current_size == new_size {
+            else if current_size - new_size <= HEADER_SIZE {
                 let next_free = unsafe {
                     *current_free.add(1) as *mut usize
                 };
@@ -145,51 +125,23 @@ impl<'a> Manager<'a> {
                 *current_free = next_free;
 
                 return ptr;
-
-                // //create the output ptr
-                // let ptr = unsafe {
-                //     current_free.add(2) as *mut u8
-                // };
-                
-                // let next_free = unsafe {
-                //     *current_free.add(1) as *mut usize
-                // };
-
-                // //do if there's a next free block
-                // if next_free as usize != self.bytes.len() {
-                //     *current_free = next_free;
-                // }
-
-                // return ptr;
             } 
             //if the diffrence is larger, than modify the current block
             else {
-                println!("fits into a free block");
-
                 //create a ptr to the place where i should slide the current free block
                 let new_free = unsafe {
                     (*current_free as *mut u8).add(new_size) as *mut usize
                 };
-
-                println!("slided free block will start at: {}", new_free as usize);
 
                 //set the size the slided free block
                 unsafe {
                     *new_free = **current_free - new_size;
                 }
 
-                println!("len of new free block: {}", unsafe {
-                    *new_free
-                });
-
                 //set the slided free block's ptr to point the next free block
                 unsafe {
                     *new_free.add(1) = *current_free.add(1);
                 }
-
-                println!("next free block: {}", unsafe {
-                    *new_free.add(1)
-                });
 
                 let front_pad = front_pad / 8;
                 //for allocated block set size
@@ -201,22 +153,6 @@ impl<'a> Manager<'a> {
                     *current_free.add(front_pad + 1) = *current_free as usize
                 }
 
-                println!("ptr to size: {}", unsafe {
-                    current_free.add(front_pad) as usize
-                });
-
-                println!("size: {}", unsafe {
-                    *current_free.add(front_pad)
-                });
-
-                println!("ptr to ptr which points to the first byte (as *mut usize): {}",  unsafe {
-                   current_free.add(front_pad + 1) as usize
-                });
-
-                println!("ptr to first byte: {}", unsafe {
-                   *current_free.add(front_pad + 1) 
-                });
-
                 //create the output ptr
                 let ptr = unsafe {
                     current_free.add(front_pad + 2) as *mut u8
@@ -224,8 +160,6 @@ impl<'a> Manager<'a> {
 
                 //update the ptr to the current free block inside the previus free block to point to valid position
                 *current_free = new_free;
-
-                println!("ptr to user data: {}", ptr as usize);
 
                 return ptr;
             }
@@ -236,10 +170,8 @@ impl<'a> Manager<'a> {
         //sets the new free block's next free_block idx to the current first_free block's idx
         let ptr = src as *mut usize;
 
-        println!("ptr to first user byte: {}", ptr as usize);
-
         let ptr_to_first_byte = unsafe {
-            ptr.sub(1)
+            *ptr.sub(1) as *mut usize
         };
 
         let ptr_to_size = unsafe {
@@ -251,8 +183,6 @@ impl<'a> Manager<'a> {
         }
 
         unsafe {
-            //*(self.bytes[idx + SIZE..idx + HEADER_SIZE].as_ptr() as *mut usize) = self.first_free;
-            //*(*ptr.sub(1) as *mut usize).add(1) = self.first_free as usize;
             *ptr_to_first_byte.add(1) = self.first_free as usize;
         }
 
