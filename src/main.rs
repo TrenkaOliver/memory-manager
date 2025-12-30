@@ -1,9 +1,15 @@
 mod manager;
 mod collections;
-use crate::collections::MyVec;
+
+use collections::MyVec;
+use manager::{debug_free, my_alloc};
 
 
 fn main() {
+
+    unsafe {
+        my_alloc(1, 1);
+    }
 
     let s = [
         Foo::new(0, 0),
@@ -24,6 +30,9 @@ fn main() {
         println!("{}.: {:?}", i, f);
     }
 
+    drop(v1);
+    debug_free();
+
     let mut v2 = MyVec::from_slice(&s);
     for e in v2.drain(..) {
         println!("drained: {:?}", {e});
@@ -31,6 +40,7 @@ fn main() {
 
     v2.iter().for_each(|e| println!("remaining: {:?}", e));
 
+    
 
 }
 

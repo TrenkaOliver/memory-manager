@@ -290,7 +290,6 @@ impl<T> Drop for MyVec<T> {
                 drop(ptr::read(self.ptr.add(i)));
             }
             my_free(self.ptr);
-            println!("dropped");
         }
     }
 }
@@ -332,7 +331,6 @@ impl<T> Drop for MyVecIntoIter<T> {
             }
             my_free(self.ptr);
         }
-        println!("dropped");
     }
 }
 

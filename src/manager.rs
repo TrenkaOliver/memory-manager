@@ -1,24 +1,18 @@
 const HEADER_SIZE: usize = size_of::<usize>() * 2;
 const LEN: usize = 8192;
 
-static mut HEAP: [u8; LEN] = {
-    let mut bytes = [0u8; LEN];
-
-    let size_bytes = LEN.to_ne_bytes();
-    let max_bytes = usize::MAX.to_ne_bytes();
-
-    let mut i = 0;
-    while i < size_of::<usize>() {
-        bytes[i] = size_bytes[i];
-        bytes[i + size_of::<usize>()] = max_bytes[i];
-        i+= 1;
-    }
-
-    bytes
-};
+static mut HEAP: AlignedArray = AlignedArray::new();
 
 static mut MANAGER: Manager = Manager::new();
 
+pub fn debug_free() {
+    unsafe {
+        (* &raw const MANAGER).debug_free();
+    }
+}
+
+//SAFETY:
+//can only allocated sequentially, not thread safe
 pub unsafe fn my_alloc(size: usize, alignment: usize) -> *mut u8 {
     unsafe {
         // MANAGER.alloc(size, alignment)
@@ -26,31 +20,64 @@ pub unsafe fn my_alloc(size: usize, alignment: usize) -> *mut u8 {
     }
 }
 
+//SAFETY:
+//can only free sequentially, not thread safe
+//can only free ptr's given upon allocation
 pub unsafe fn my_free<T>(ptr: *mut T) {
     unsafe {
         (* &raw mut MANAGER).free(ptr);
     }
 }
 
+
+//a wrapper around the bytes used as heap so it will always be 8 aligned
+#[repr(align(8))]
+struct AlignedArray([u8; LEN]);
+
+impl AlignedArray {
+    const fn new() -> AlignedArray {
+        assert!(LEN > HEADER_SIZE);
+        
+        let mut bytes = [0u8; LEN];
+
+        let size_bytes = LEN.to_ne_bytes();
+        let max_bytes = usize::MAX.to_ne_bytes();
+
+        let mut i = 0;
+        while i < size_of::<usize>() {
+            bytes[i] = size_bytes[i];
+            bytes[i + size_of::<usize>()] = max_bytes[i];
+            i+= 1;
+        }
+
+        AlignedArray(bytes)
+    }
+}
+
+//first_free: points to the first free block
+/*
+    Free block layout:
+    HEADER
+        1. usize: size of block in bytes including HEADER
+        2. *mut usize: points to the next free block
+    REST OF BYTES
+ */ 
+/*
+    ALlocated block layout:
+    1. FRONT PADDING: enough bytes so the user data will have required alignment
+    2. HEADER
+        1. usize: size of the allocated block including everything
+        2. *mut usize: points to the first byte of the allocated block
+    3. USER DATA (bytes)
+    4. END PADDING: max HEADER_SIZE bytes, so no bytes will be lost forever
+ */
+//Note: the last free block's ptr as usize == USIZE::MAX
 struct Manager {
     first_free: *mut usize,
 }
 
-//IMPORTANT!!!
-//Freeing or getting a random ptr (not one which was given upon allocation) is UB
-//n := size_of::<usize>()
-//free block: n bytes: size(usize), n bytes:ptr to next free block(*mut usize), the rest isn't used
-//allocated block: n bytes: size(usize) n bytes: placeholder, ...used bytes..., max n bytes padding if necesarry
-//first 2n bytes is the HEADER
-//size includes the whole block not just the used/rest bytes
-//the last free block's ptr to the next free block (which doesn't exists) as a usize is equal to the bytes array's len marking it as the last free block
-//ptrs returned by the alloc fn will point to the first user used byte not the first in the header (size's first byte)
 impl Manager {
     const fn new() -> Manager {
-        //creating manager for smaller array than HEADER_SIZE wouldn't make sense
-        assert!(LEN > HEADER_SIZE);
-
-        //create a ptr to the first free block to know where to start searching for allocation
         let first_free = &raw mut HEAP as *mut usize;
 
         Manager { first_free }
@@ -89,10 +116,7 @@ impl Manager {
 
         let alignment = alignment.max(8);
 
-        let mut end_pad = size_of::<usize>() - size % size_of::<usize>();
-        if end_pad == size_of::<usize>() {
-            end_pad = 0;
-        }
+        let end_pad = (size_of::<usize>() - size % size_of::<usize>()) % size_of::<usize>();
 
         loop {
             //copy the pointee of current_size, so I don't need to dereference it later on each time I need the value
@@ -110,7 +134,7 @@ impl Manager {
 
             let new_size = front_pad + HEADER_SIZE + size + end_pad;
 
-            //if it's (data + header size) is larger, than check the next free block
+            //if it's (new_size) is larger, than check the next free block
             if new_size > current_size {
                 current_free = unsafe {
                     &mut *(current_free.add(1) as *mut *mut usize)
@@ -156,22 +180,17 @@ impl Manager {
                 };
 
                 //set the size the slided free block
-                unsafe {
-                    *new_free = **current_free - new_size;
-                }
-
                 //set the slided free block's ptr to point the next free block
                 unsafe {
+                    *new_free = **current_free - new_size;
                     *new_free.add(1) = *current_free.add(1);
                 }
 
-                let front_pad = front_pad / 8;
                 //for allocated block set size
+                //for allocated block set ptr to the first byte (as *mut usize, ill need it as *mut usize for freeing)
+                let front_pad = front_pad / 8;
                 unsafe {
                     *current_free.add(front_pad) = new_size;
-                }
-
-                unsafe {
                     *current_free.add(front_pad + 1) = *current_free as usize
                 }
 
@@ -202,9 +221,6 @@ impl Manager {
 
         unsafe {
             *ptr_to_first_byte = *ptr_to_size;
-        }
-
-        unsafe {
             *ptr_to_first_byte.add(1) = self.first_free as usize;
         }
 
