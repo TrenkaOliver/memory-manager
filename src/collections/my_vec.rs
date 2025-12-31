@@ -317,7 +317,7 @@ impl<T> Drop for MyVec<T> {
     fn drop(&mut self) {
         unsafe {
             for i in 0..self.len {
-                drop(ptr::read(self.ptr.add(i)));
+                ptr::drop_in_place(self.ptr.add(i));
             }
             my_free(self.ptr);
         }
