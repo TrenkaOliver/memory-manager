@@ -1,4 +1,4 @@
-use std::{ops::{Deref, DerefMut}, ptr};
+use std::{fmt::Display, ops::{Deref, DerefMut}, ptr};
 
 use crate::manager::{my_alloc, my_free};
 
@@ -82,6 +82,12 @@ impl<'a, T> Drop for MyRef<'a, T> {
     }
 }
 
+impl<'a, T: Display> Display for MyRef<'a, T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", &**self)
+    }
+}
+
 impl<'a, T> Deref for MyRefMut<'a, T> {
     type Target = T;
 
@@ -105,5 +111,11 @@ impl<'a, T> Drop for MyRefMut<'a, T> {
         unsafe {
             *self.cell.state_ptr = 0;
         }
+    }
+}
+
+impl<'a, T: Display> Display for MyRefMut<'a, T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", &**self)
     }
 }
