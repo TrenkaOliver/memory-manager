@@ -1,7 +1,7 @@
 mod manager;
 mod collections;
 
-use collections::MyVec;
+use collections::{MyVec, MyString};
 use manager::{debug_free, my_alloc};
 
 
@@ -11,37 +11,28 @@ fn main() {
         my_alloc(1, 1);
     }
 
-    let s = [
-        Foo::new(0, 0),
-        Foo::new(1, 1),
-        Foo::new(2, 2),
-        Foo::new(3, 3),
-        Foo::new(4, 4),
-        Foo::new(5, 5),
-        Foo::new(6, 6),
-        Foo::new(7, 7),
-        Foo::new(8, 8),
-        Foo::new(9, 9),
-    ];
+    let mut my_string = MyString::from_str("alma");
+    my_string.push_str("\nkecske");
+    my_string.push('\n');
+    my_string.push('b');
+    my_string.push('é');
+    my_string.push('k');
+    my_string.push('a');
 
-    let v1 = MyVec::from_slice(&s);
-
-    for (i, f) in v1.iter().enumerate() {
-        println!("{}.: {:?}", i, f);
+    for line in my_string.lines() {
+        println!("line: {}", line)
     }
 
-    drop(v1);
-    debug_free();
-
-    let mut v2 = MyVec::from_slice(&s);
-    for e in v2.drain(..) {
-        println!("drained: {:?}", {e});
-    }
-
-    v2.iter().for_each(|e| println!("remaining: {:?}", e));
-
+    let mut my_string = MyString::from_str("🚀aá中a🚀中");
+    my_string.insert(4, 'k');
+    my_string.insert_str(11, "(inserted)");
     
+    println!("my_string: {}", my_string);
+    my_string.remove(8);
+    println!("my_string: {}", my_string);
 
+    drop(my_string);
+    
 }
 
 
