@@ -2,8 +2,6 @@ mod manager;
 mod collections;
 mod smart_pointers;
 
-use std::rc::Rc;
-
 use collections::{MyVec, MyString};
 use smart_pointers::{MyBox, MyRc, MyWeak};
 use manager::{debug_free, my_alloc};
@@ -11,7 +9,7 @@ use manager::{debug_free, my_alloc};
 
 
 fn main() {
-
+    
 }
 
 

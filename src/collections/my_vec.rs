@@ -1,6 +1,6 @@
 use std::{ops::{Index, IndexMut, RangeBounds}, ptr};
 
-use crate::manager::{my_alloc, my_free};
+use crate::manager::{debug_free, my_alloc, my_free};
 
 pub struct MyVec<T> {
     ptr: *mut T,
@@ -446,6 +446,12 @@ impl<'a, T> Iterator for Drain<'a, T>  {
 
 impl<'a, T> Drop for Drain<'a, T> {
     fn drop(&mut self) {
+        for i in self.index..self.end {
+            unsafe {
+                ptr::drop_in_place(self.vec.ptr.add(i));
+            }
+        }
+
         if self.end != self.vec.len { 
             unsafe {
                 ptr::copy(self.vec.ptr.add(self.end), self.vec.ptr.add(self.start), self.vec.len - self.end);
