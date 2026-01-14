@@ -183,7 +183,7 @@ impl<T> MyVec<T> {
         self.len = len;
     }
 
-    pub fn drain<'a, R>(&'a mut self, range: R) -> Drain<'a, T>
+    pub fn drain<'a, R>(&'a mut self, range: R) -> MyDrain<'a, T>
     where R: RangeBounds<usize> {
         let len = self.len;
         let start = match range.start_bound() {
@@ -199,7 +199,7 @@ impl<T> MyVec<T> {
 
         assert!(start <= end && end <= len);
 
-        Drain { vec: self, index: start, start, end }
+        MyDrain { vec: self, index: start, start, end }
     }
 }
 
@@ -416,14 +416,14 @@ impl<'a, T> Iterator for MyVecIterMut<'a, T> {
     }
 }
 
-pub struct Drain<'a, T> {
+pub struct MyDrain<'a, T> {
     vec: &'a mut MyVec<T>,
     index: usize,
     start: usize,
     end: usize,
 }
 
-impl<'a, T> Iterator for Drain<'a, T>  {
+impl<'a, T> Iterator for MyDrain<'a, T>  {
     type Item = T;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -444,7 +444,7 @@ impl<'a, T> Iterator for Drain<'a, T>  {
     }
 }
 
-impl<'a, T> Drop for Drain<'a, T> {
+impl<'a, T> Drop for MyDrain<'a, T> {
     fn drop(&mut self) {
         for i in self.index..self.end {
             unsafe {
