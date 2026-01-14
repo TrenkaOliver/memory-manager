@@ -199,7 +199,10 @@ impl<T> MyVec<T> {
 
         assert!(start <= end && end <= len);
 
-        MyDrain { vec: self, index: start, start, end }
+        let tail = self.len - end;
+        self.len = start;
+
+        MyDrain { vec: self, index: start, end, tail }
     }
 }
 
@@ -419,8 +422,8 @@ impl<'a, T> Iterator for MyVecIterMut<'a, T> {
 pub struct MyDrain<'a, T> {
     vec: &'a mut MyVec<T>,
     index: usize,
-    start: usize,
     end: usize,
+    tail: usize,
 }
 
 impl<'a, T> Iterator for MyDrain<'a, T>  {
@@ -454,9 +457,10 @@ impl<'a, T> Drop for MyDrain<'a, T> {
 
         if self.end != self.vec.len { 
             unsafe {
-                ptr::copy(self.vec.ptr.add(self.end), self.vec.ptr.add(self.start), self.vec.len - self.end);
+                ptr::copy(self.vec.ptr.add(self.end), self.vec.ptr.add(self.vec.len), self.tail);
             } 
         }
-        self.vec.len -= self.end - self.start;
+        
+        self.vec.len += self.tail;
     }
 }

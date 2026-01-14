@@ -2,6 +2,8 @@ mod manager;
 mod collections;
 mod smart_pointers;
 
+use std::mem;
+
 use collections::{MyVec, MyString};
 use smart_pointers::{MyBox, MyRc, MyWeak};
 use manager::{debug_free, my_alloc};
