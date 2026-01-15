@@ -1,4 +1,4 @@
-use std::{fmt::Display, ops::{Deref, DerefMut}, ptr};
+use core::{fmt::Display, ops::{Deref, DerefMut}, ptr, marker::{Send, Sync}};
 
 use crate::manager::{my_alloc, my_free};
 
@@ -7,6 +7,10 @@ use crate::manager::{my_alloc, my_free};
 pub struct MyBox<T> {
     ptr: *mut T,
 }
+
+unsafe impl<T: Send> Send for MyBox<T> {}
+unsafe impl<T: Sync> Sync for MyBox<T> {}
+
 
 impl<T> MyBox<T> {
     pub fn new(value: T) -> MyBox<T> {

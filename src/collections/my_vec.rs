@@ -1,4 +1,4 @@
-use std::{fmt::Debug, ops::{Index, IndexMut, RangeBounds}, ptr};
+use core::{fmt::Debug, ops::{Index, IndexMut, RangeBounds}, ptr, marker::{Send, Sync}};
 
 use crate::manager::{debug_free, my_alloc, my_free};
 
@@ -7,6 +7,10 @@ pub struct MyVec<T> {
     len: usize,
     cap: usize,
 }
+
+//marker traits
+unsafe impl<T: Send> Send for MyVec<T> {}
+unsafe impl<T: Sync> Sync for MyVec<T> {}
 
 //constructors, getters
 impl<T> MyVec<T> {

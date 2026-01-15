@@ -1,4 +1,4 @@
-use std::sync::atomic::{AtomicBool, Ordering::*};
+use core::sync::atomic::{AtomicBool, Ordering::*};
 
 const HEADER_SIZE: usize = size_of::<usize>() * 2;
 const LEN: usize = 8192;

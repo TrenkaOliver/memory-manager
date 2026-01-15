@@ -1,4 +1,4 @@
-use std::{fmt::Display, ops::{Deref, DerefMut}, ptr};
+use core::{fmt::Display, ops::{Deref, DerefMut}, ptr};
 
 use crate::{manager::{my_alloc, my_free}, smart_pointers::MyBox};
 

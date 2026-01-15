@@ -2,7 +2,7 @@ mod manager;
 mod collections;
 mod smart_pointers;
 
-use std::{mem, thread, time::Duration};
+use std::thread;
 
 use collections::{MyVec, MyString};
 use smart_pointers::{MyBox, MyRc, MyWeak};
@@ -11,11 +11,10 @@ use manager::{debug_free, my_alloc};
 fn main() {
     {
         let mut handles = MyVec::new();
-        for i in 1..=10 {
+        for i in 1..=50 {
             let h = thread::spawn(move || {
-                let mut v = MyVec::new();
-                thread::sleep(Duration::from_millis(10 - i));
-                for j in 1..=10 {
+                let mut v = MyVec::with_capacity(20);
+                for j in 1..=20 {
                     v.push(i * j);
                 }
                 println!("{:?}", v);
@@ -26,7 +25,7 @@ fn main() {
 
         for h in handles {
             h.join().unwrap();
-        }    
+        }
     }
 
     debug_free();
