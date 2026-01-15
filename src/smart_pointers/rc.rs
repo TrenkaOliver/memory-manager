@@ -2,8 +2,6 @@ use core::{fmt::Display, ops::{Deref, DerefMut}, ptr};
 
 use crate::{manager::{my_alloc, my_free}, smart_pointers::MyBox};
 
-
-
 pub struct MyRc<T> {
     strong_ptr: *mut usize,
     weak_ptr: *mut usize,

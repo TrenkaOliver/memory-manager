@@ -1,4 +1,5 @@
 use core::{fmt::Debug, ops::{Index, IndexMut, RangeBounds}, ptr, marker::{Send, Sync}};
+use std::collections::btree_set::Iter;
 
 use crate::manager::{debug_free, my_alloc, my_free};
 
@@ -339,6 +340,16 @@ impl<T: Debug> Debug for MyVec<T> {
             list.entry(item);
         };
         list.finish()
+    }
+}
+
+impl<T: Clone> Clone for MyVec<T> {
+    fn clone(&self) -> Self {
+        let mut out = MyVec::with_capacity(self.cap);
+        for item in self {
+            out.push(item.clone());
+        }
+        out
     }
 }
 

@@ -25,6 +25,12 @@ impl<T> MyBox<T> {
     }
 }
 
+impl<T: Clone> Clone for MyBox<T> {
+    fn clone(&self) -> Self {
+        MyBox::new((**self).clone())
+    }
+}
+
 impl<T> Deref for MyBox<T> {
     type Target = T;
 
