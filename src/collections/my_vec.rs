@@ -1,4 +1,4 @@
-use std::{ops::{Index, IndexMut, RangeBounds}, ptr};
+use std::{fmt::Debug, ops::{Index, IndexMut, RangeBounds}, ptr};
 
 use crate::manager::{debug_free, my_alloc, my_free};
 
@@ -324,6 +324,17 @@ impl<T> Drop for MyVec<T> {
             }
             my_free(self.ptr);
         }
+    }
+}
+
+impl<T: Debug> Debug for MyVec<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        //f.debug_struct("MyVec").field("ptr", &self.ptr).field("len", &self.len).field("cap", &self.cap).finish()
+        let mut list = f.debug_list();
+        for item in self {
+            list.entry(item);
+        };
+        list.finish()
     }
 }
 

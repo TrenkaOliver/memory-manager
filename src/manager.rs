@@ -1,3 +1,5 @@
+use std::sync::atomic::{AtomicBool, Ordering::*};
+
 const HEADER_SIZE: usize = size_of::<usize>() * 2;
 const LEN: usize = 8192;
 
@@ -5,15 +7,36 @@ static mut HEAP: AlignedArray = AlignedArray::new();
 
 static mut MANAGER: Manager = Manager::new();
 
+static LOCKED: AtomicBool = AtomicBool::new(false);
+
+//prevents deadlock: if thread panics, Guard's drop fn executes
+//which unlocks the manager, also unlocks when goes out of scope
+struct Guard;
+
+impl Drop for Guard {
+    fn drop(&mut self) {
+        LOCKED.store(false, Release);
+    }
+}
+
+//lock the thread, so heap modifications won't be corrupted
+//returns guard to prevent deadlock
+fn lock() -> Guard {
+    while LOCKED.compare_exchange(false, true, Acquire, Relaxed).is_err() {
+        std::hint::spin_loop();
+    }
+    Guard
+}
+
 pub fn debug_free() {
+    let _guard = lock();
     unsafe {
         (* &raw const MANAGER).debug_free();
     }
 }
 
-//SAFETY:
-//can only allocated sequentially, not thread safe
-pub unsafe fn my_alloc(size: usize, alignment: usize) -> *mut u8 {
+pub fn my_alloc(size: usize, alignment: usize) -> *mut u8 {
+    let _guard = lock();
     unsafe {
         // MANAGER.alloc(size, alignment)
         (* &raw mut MANAGER).alloc(size, alignment)
@@ -21,9 +44,9 @@ pub unsafe fn my_alloc(size: usize, alignment: usize) -> *mut u8 {
 }
 
 //SAFETY:
-//can only free sequentially, not thread safe
 //can only free ptr's given upon allocation
 pub unsafe fn my_free<T>(ptr: *mut T) {
+    let _guard = lock();
     unsafe {
         (* &raw mut MANAGER).free(ptr);
     }
