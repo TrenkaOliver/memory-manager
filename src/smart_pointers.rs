@@ -1,6 +1,5 @@
-mod boxed;
-mod rc;
-mod ref_cell;
+pub mod boxed;
+pub mod rc;
+pub mod ref_cell;
 
-pub use boxed::MyBox;
-pub use rc::{MyRc, MyWeak};
+pub mod arc;

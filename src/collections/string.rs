@@ -1,6 +1,6 @@
 use core::{str, fmt::Display, ops::{Add, AddAssign, Deref, DerefMut}};
 
-use crate::collections::MyVec;
+use super::vec::MyVec;
 
 pub struct MyString {
     vec: MyVec<u8>

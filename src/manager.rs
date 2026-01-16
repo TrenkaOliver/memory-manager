@@ -1,4 +1,4 @@
-use core::sync::atomic::{AtomicBool, Ordering::*};
+use core::sync::atomic::{AtomicBool, Ordering};
 
 const HEADER_SIZE: usize = size_of::<usize>() * 2;
 const LEN: usize = 8192;
@@ -15,15 +15,15 @@ struct Guard;
 
 impl Drop for Guard {
     fn drop(&mut self) {
-        LOCKED.store(false, Release);
+        LOCKED.store(false, Ordering::Release);
     }
 }
 
 //lock the thread, so heap modifications won't be corrupted
 //returns guard to prevent deadlock
 fn lock() -> Guard {
-    while LOCKED.compare_exchange(false, true, Acquire, Relaxed).is_err() {
-        std::hint::spin_loop();
+    while LOCKED.compare_exchange_weak(false, true, Ordering::Acquire, Ordering::Relaxed).is_err() {
+        core::hint::spin_loop();
     }
     Guard
 }
@@ -38,7 +38,6 @@ pub fn debug_free() {
 pub fn my_alloc(size: usize, alignment: usize) -> *mut u8 {
     let _guard = lock();
     unsafe {
-        // MANAGER.alloc(size, alignment)
         (* &raw mut MANAGER).alloc(size, alignment)
     }
 }
