@@ -8,7 +8,7 @@ mod smart_pointers;
 static S_INT: &'static u32 = &2;
 
 fn main() {
-    
+
 }
 
 #[derive(Debug)]
