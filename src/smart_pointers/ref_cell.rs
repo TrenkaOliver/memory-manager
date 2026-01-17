@@ -1,6 +1,5 @@
 use core::{fmt::Display, ops::{Deref, DerefMut}};
-
-use crate::smart_pointers::unsafe_cell::MyUnsafeCell;
+use core::cell::UnsafeCell;
 
 pub struct MyRef<'a, T> {
     ref_cell: &'a MyRefCell<T>
@@ -11,13 +10,15 @@ pub struct MyRefMut<'a, T> {
 }
 
 pub struct MyRefCell<T> {
-    state: MyUnsafeCell<isize>,
-    value: MyUnsafeCell<T>,
+    state: UnsafeCell<isize>,
+    value: UnsafeCell<T>,
 }
+
+unsafe impl<T: Send> Send for MyRefCell<T> {}
 
 impl<T> MyRefCell<T> {
     pub fn new(value: T) -> MyRefCell<T> {
-        MyRefCell { value: MyUnsafeCell::new(value), state: MyUnsafeCell::new(0) }
+        MyRefCell { value: UnsafeCell::new(value), state: UnsafeCell::new(0) }
     }
 
     pub fn borrow(&'_ self) -> MyRef<'_, T> {

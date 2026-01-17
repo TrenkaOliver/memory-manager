@@ -2,12 +2,11 @@ use core::sync::atomic::{AtomicBool, Ordering};
 use core::ops::{Deref, DerefMut};
 use core::fmt::Display;
 use core::marker::PhantomData;
-
-use crate::smart_pointers::unsafe_cell::MyUnsafeCell;
+use core::cell::UnsafeCell;
 
 pub struct MyMutex<T> {
     locked: AtomicBool,
-    value: MyUnsafeCell<T>,
+    value: UnsafeCell<T>,
 }
 
 unsafe impl<T: Send> Send for MyMutex<T> {}
@@ -22,7 +21,7 @@ impl<T> MyMutex<T> {
     pub fn new(value: T) -> MyMutex<T> {
         MyMutex {
             locked: AtomicBool::new(false),
-            value: MyUnsafeCell::new(value),
+            value: UnsafeCell::new(value),
         }
     }
 
