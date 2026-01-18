@@ -54,6 +54,7 @@ pub unsafe fn my_free<T>(ptr: *mut T) {
 
 //a wrapper around the bytes used as heap so it will always be 8 aligned
 #[repr(align(8))]
+#[allow(dead_code)]
 struct AlignedArray([u8; LEN]);
 
 impl AlignedArray {

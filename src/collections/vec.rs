@@ -1,7 +1,6 @@
 use core::{fmt::Debug, ops::{Index, IndexMut, RangeBounds}, ptr, marker::{Send, Sync}};
-use std::collections::btree_set::Iter;
 
-use crate::manager::{debug_free, my_alloc, my_free};
+use crate::manager::{my_alloc, my_free};
 
 pub struct MyVec<T> {
     ptr: *mut T,
@@ -20,9 +19,7 @@ impl<T> MyVec<T> {
     }
     
     pub fn with_capacity(capacity: usize) -> MyVec<T> {
-        let ptr = unsafe {
-            my_alloc(size_of::<T>() * capacity, align_of::<T>()) as *mut T
-        };
+        let ptr = my_alloc(size_of::<T>() * capacity, align_of::<T>()) as *mut T;
 
         MyVec { ptr, len: 0, cap: capacity }
     }
@@ -216,9 +213,7 @@ impl<T> MyVec<T> {
     fn reallocate(&mut self, to: Option<usize>) {
         if self.cap == 0 {
             self.cap = 4;
-            self.ptr = unsafe {
-                my_alloc(4 * size_of::<T>(), align_of::<T>()) as *mut T
-            };
+            self.ptr = my_alloc(4 * size_of::<T>(), align_of::<T>()) as *mut T;
             return;
         }
 
@@ -234,9 +229,7 @@ impl<T> MyVec<T> {
             new_cap = c;
         }
 
-        let new_ptr = unsafe {
-            my_alloc(new_cap * size_of::<T>(), align_of::<T>()) as *mut T
-        };
+        let new_ptr = my_alloc(new_cap * size_of::<T>(), align_of::<T>()) as *mut T;
 
         unsafe {
             ptr::copy_nonoverlapping(self.ptr, new_ptr, self.cap);
